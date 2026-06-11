@@ -1,0 +1,51 @@
+#!/bin/zsh
+# era — mission architect for MAI.
+# Turns a rough prompt into a well-structured MISSION.md + DONE.template.md
+# in the target folder, ready to execute with:  mai <folder>
+#
+# Usage:
+#   era <folder> "<rough prompt>"
+#   era . "make my api faster"
+#
+# Env overrides:
+#   MODEL=haiku era ...
+
+set -u
+
+TARGET_RAW="${1:?usage: era <folder> \"<rough prompt>\"}"
+PROMPT="${2:?usage: era <folder> \"<rough prompt>\"}"
+mkdir -p "$TARGET_RAW"
+TARGET="${TARGET_RAW:A}"
+
+MODEL="${MODEL:-sonnet}"
+
+SYSTEM="You are ERA, a mission architect for an autonomous agent system called MAI. MAI agents run unattended: they get MISSION.md, work alone with full admin rights inside this folder (read-only outside), can spawn parallel subagents, and stop only when they write DONE.md proving the goal is achieved.
+
+Your job, from the user's rough prompt:
+1. Briefly inspect this folder (if not empty) to ground the mission in reality.
+2. Write MISSION.md with sections: # Mission (one-line goal), ## Context (folder state, relevant facts), ## Tasks (concrete steps, mark which can run as parallel subagents), ## Constraints (what NOT to do), ## Verification (exact commands/checks proving success — must be objectively checkable), ## Deliverables (exact filenames the agent must produce).
+3. Write DONE.template.md — the acceptance checklist the final DONE.md must satisfy: every deliverable listed, every verification step with its expected result, checkbox format.
+
+Rules: make the end goal VERIFIABLE (commands, file existence, measurable thresholds) — never fuzzy words like 'improve' without a metric. Keep both files tight and unambiguous; an agent with zero access to the user must execute them without questions. Write ONLY these two files, change nothing else. Do not start executing the mission yourself."
+
+cd "$TARGET" || exit 1
+
+echo "[era] target  : $TARGET"
+echo "[era] model   : $MODEL"
+echo "[era] drafting MISSION.md + DONE.template.md ..."
+
+claude -p \
+  --model "$MODEL" \
+  --permission-mode acceptEdits \
+  --allowedTools "Read,Write,Edit,Glob,Grep" \
+  --append-system-prompt "$SYSTEM" \
+  -- "Rough mission prompt from the user: $PROMPT"
+
+if [[ -f "$TARGET/MISSION.md" ]]; then
+  echo ""
+  echo "[era] ✅ ready. Review MISSION.md, then launch:"
+  echo "      mai $TARGET"
+else
+  echo "[era] ⚠️  MISSION.md was not created — see output above" >&2
+  exit 1
+fi

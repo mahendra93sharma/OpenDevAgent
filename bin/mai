@@ -1,0 +1,97 @@
+#!/bin/zsh
+# mai — launch an autonomous Claude agent jailed to one folder.
+#
+# Usage:
+#   mai <agent-dir> "<mission prompt>"
+#   mai <agent-dir>              # reads <agent-dir>/MISSION.md
+#
+# Guarantees:
+#   - Mac stays awake while the agent runs (caffeinate -dims)
+#   - Agent can READ anywhere + use network, but can WRITE only inside <agent-dir>
+#     (enforced by macOS sandbox-exec, not by trust)
+#   - Agent never asks for permission; it decides on its own and keeps going
+#     until it writes <agent-dir>/DONE.md (or MAX_RESUMES is hit)
+#
+# Env overrides:
+#   MODEL=sonnet MAX_RESUMES=20 MAX_BUDGET_USD=10 mai ...
+
+set -u
+
+SCRIPT_DIR="${0:A:h}"
+ROOT_DIR="${SCRIPT_DIR:h}"
+PROFILE_TEMPLATE="$ROOT_DIR/sandbox/agent.sb.template"
+
+AGENT_DIR_RAW="${1:?usage: mai <agent-dir> [mission prompt]}"
+mkdir -p "$AGENT_DIR_RAW"
+AGENT_DIR="${AGENT_DIR_RAW:A}"   # absolute, symlinks resolved
+
+MISSION="${2:-}"
+if [[ -z "$MISSION" ]]; then
+  if [[ -f "$AGENT_DIR/MISSION.md" ]]; then
+    MISSION="$(cat "$AGENT_DIR/MISSION.md")"
+  else
+    echo "error: no mission prompt given and no $AGENT_DIR/MISSION.md found" >&2
+    exit 1
+  fi
+fi
+
+MODEL="${MODEL:-fable}"
+MAX_RESUMES="${MAX_RESUMES:-10}"
+MAX_BUDGET_USD="${MAX_BUDGET_USD:-25}"
+
+LOG_DIR="$AGENT_DIR/.agent/logs"
+mkdir -p "$LOG_DIR"
+RUN_ID="$(date +%Y%m%d-%H%M%S)"
+LOG="$LOG_DIR/run-$RUN_ID.log"
+
+# Persist mission for resumes / audit
+[[ -f "$AGENT_DIR/MISSION.md" ]] || print -r -- "$MISSION" > "$AGENT_DIR/MISSION.md"
+rm -f "$AGENT_DIR/DONE.md"
+
+# Render sandbox profile
+PROFILE="$AGENT_DIR/.agent/profile.sb"
+sed -e "s|__AGENT_DIR__|$AGENT_DIR|g" -e "s|__HOME__|$HOME|g" \
+  "$PROFILE_TEMPLATE" > "$PROFILE"
+
+SYSTEM_APPEND="You are a fully autonomous agent. There is NO human watching; never ask questions, never wait for confirmation — make every decision yourself and proceed. Your working folder is $AGENT_DIR; you have full control inside it. The OS blocks writes outside it (reads and network are fine) — do not fight write-denied errors outside your folder, work inside it instead. Keep working until the mission's end goal is verifiably achieved. When (and only when) the goal is fully achieved and verified, write a file DONE.md in your working folder summarizing what was done, how you verified it, and where the results are. If you hit a dead end, try alternative approaches before giving up; if truly impossible, write DONE.md explaining why with evidence."
+
+run_claude() {
+  local -a extra
+  extra=("$@")
+  caffeinate -dims \
+    sandbox-exec -f "$PROFILE" \
+    claude -p \
+      --model "$MODEL" \
+      --permission-mode bypassPermissions \
+      --dangerously-skip-permissions \
+      --max-budget-usd "$MAX_BUDGET_USD" \
+      --append-system-prompt "$SYSTEM_APPEND" \
+      --verbose \
+      "${extra[@]}" 2>&1 | tee -a "$LOG"
+}
+
+echo "[mai] agent dir : $AGENT_DIR"   | tee -a "$LOG"
+echo "[mai] model     : $MODEL"        | tee -a "$LOG"
+echo "[mai] budget    : \$$MAX_BUDGET_USD" | tee -a "$LOG"
+echo "[mai] log       : $LOG"
+echo "[mai] mission   :"               | tee -a "$LOG"
+print -r -- "$MISSION" | sed 's/^/    /'       | tee -a "$LOG"
+
+cd "$AGENT_DIR" || exit 1
+
+echo "[mai] launch initial run..." | tee -a "$LOG"
+run_claude -- "$MISSION"
+
+attempt=0
+while [[ ! -f "$AGENT_DIR/DONE.md" && $attempt -lt $MAX_RESUMES ]]; do
+  attempt=$((attempt + 1))
+  echo "[mai] DONE.md not found — resume #$attempt/$MAX_RESUMES" | tee -a "$LOG"
+  run_claude --continue -- "The session ended but DONE.md does not exist, so the mission is not finished. Re-read MISSION.md, assess current state of the folder, and continue until the end goal is verifiably achieved. Then write DONE.md."
+done
+
+if [[ -f "$AGENT_DIR/DONE.md" ]]; then
+  echo "[mai] ✅ mission complete — see $AGENT_DIR/DONE.md" | tee -a "$LOG"
+else
+  echo "[mai] ⚠️  gave up after $MAX_RESUMES resumes — see $LOG" | tee -a "$LOG"
+  exit 2
+fi

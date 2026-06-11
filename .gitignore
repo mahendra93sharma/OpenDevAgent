@@ -1,0 +1,6 @@
+# agent runtime artifacts (created when running agents inside this repo)
+.agent/
+**/.agent/
+DONE.md
+*.log
+.DS_Store

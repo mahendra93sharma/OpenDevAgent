@@ -1,0 +1,29 @@
+; MAI sandbox profile (template)
+; Placeholders __AGENT_DIR__ and __HOME__ are replaced by bin/mai at launch.
+;
+; Policy:
+;   - allow everything by default (read, network, exec)
+;   - deny ALL file writes
+;   - re-allow writes only inside: agent folder, Claude Code state, temp dirs, devices
+(version 1)
+(allow default)
+
+(deny file-write*)
+
+(allow file-write*
+  ; agent is admin inside its own folder
+  (subpath "__AGENT_DIR__")
+
+  ; Claude Code needs its own state dirs to function
+  (subpath "__HOME__/.claude")
+  (literal "__HOME__/.claude.json")
+  (literal "__HOME__/.claude.json.backup")
+  (literal "__HOME__/.claude.json.lock")
+  (subpath "__HOME__/Library/Caches")
+  (subpath "__HOME__/Library/Logs")
+
+  ; temp + devices (tty, null, ptys)
+  (subpath "/private/tmp")
+  (subpath "/private/var/folders")
+  (subpath "/dev")
+)
