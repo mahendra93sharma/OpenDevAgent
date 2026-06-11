@@ -143,8 +143,7 @@ turns a rough prompt into a proper mission:
 
 ```sh
 cd ~/AnyProject
-era . "make my api faster"      # rough idea in...
-mai .                           # ...structured mission executed
+era . "make my api faster"      # rough idea in → mission drafted → MAI auto-starts
 ```
 
 ERA inspects the folder, then writes:
@@ -153,8 +152,11 @@ ERA inspects the folder, then writes:
   marked), constraints, **verifiable** success checks, exact deliverables
 - `DONE.template.md` — acceptance checklist MAI's final `DONE.md` must satisfy
 
-Review/edit `MISSION.md` if you want, then launch `mai <folder>`. ERA uses
-`sonnet` by default (cheap, fast) — override with `MODEL=fable era ...`.
+…then **automatically hands off to `mai <folder>`** to execute the mission.
+Want to review/edit `MISSION.md` first? Run `ERA_AUTO_MAI=0 era ...` to draft
+only, then launch `mai <folder>` yourself whenever ready — `mai` always works
+standalone. ERA uses `sonnet` by default (cheap, fast) — override with
+`MODEL=fable era ...`.
 
 ---
 

@@ -1,14 +1,16 @@
 #!/bin/zsh
 # era — mission architect for MAI.
 # Turns a rough prompt into a well-structured MISSION.md + DONE.template.md
-# in the target folder, ready to execute with:  mai <folder>
+# in the target folder, then AUTO-STARTS `mai <folder>` to execute the mission.
+# (mai can still be run separately at any time: mai <folder>)
 #
 # Usage:
 #   era <folder> "<rough prompt>"
 #   era . "make my api faster"
 #
 # Env overrides:
-#   MODEL=haiku era ...
+#   MODEL=haiku era ...          # model for drafting (inherited by mai too if set)
+#   ERA_AUTO_MAI=0 era ...       # draft only, do NOT auto-start mai
 
 set -u
 
@@ -63,11 +65,29 @@ claude -p \
   | logfmt \
   | tee -a "$LOG"
 
-if [[ -f "$TARGET/MISSION.md" ]]; then
-  echo ""
-  echo "[era] ✅ ready. Review MISSION.md, then launch:"
-  echo "      mai $TARGET"
-else
+if [[ ! -f "$TARGET/MISSION.md" ]]; then
   echo "[era] ⚠️  MISSION.md was not created — see output above" >&2
   exit 1
 fi
+
+if [[ "${ERA_AUTO_MAI:-1}" != "1" ]]; then
+  echo ""
+  echo "[era] ✅ ready (ERA_AUTO_MAI=0). Review MISSION.md, then launch:"
+  echo "      mai $TARGET"
+  exit 0
+fi
+
+# Hand off to MAI for the same mission. Prefer the mai next to this script
+# (works for repo checkout and ~/.local/bin symlinks alike), fall back to PATH.
+MAI_BIN="$SCRIPT_DIR/mai"
+[[ -x "$MAI_BIN" ]] || MAI_BIN="$(command -v mai || true)"
+if [[ -z "$MAI_BIN" ]]; then
+  echo "[era] ⚠️  mai not found — MISSION.md is ready, launch manually:" >&2
+  echo "      mai $TARGET" >&2
+  exit 1
+fi
+
+echo ""
+echo "[era] ✅ MISSION.md ready — auto-starting MAI for this mission"
+echo "[era] handing off: $MAI_BIN $TARGET"
+exec "$MAI_BIN" "$TARGET"

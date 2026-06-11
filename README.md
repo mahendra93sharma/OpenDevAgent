@@ -14,9 +14,12 @@ Two commands:
 
 ```sh
 cd ~/my-project
-era . "add unit tests and get coverage above 80%"   # rough idea → structured mission
-mai .                                               # executes until verifiably done
+era . "add unit tests and get coverage above 80%"   # rough idea → mission → auto-runs mai
 ```
+
+`era` drafts the mission, then **auto-starts `mai`** on it. `mai` also works
+standalone (`mai .` with an existing/hand-written `MISSION.md`), and
+`ERA_AUTO_MAI=0 era ...` drafts only, without launching `mai`.
 
 That's it. Come back to `DONE.md` — what was done, how it was verified, where
 the results are.
@@ -63,7 +66,8 @@ log of every action in `<folder>/.agent/logs/`.
 
 1. `era` inspects your folder and writes `MISSION.md` (goal, tasks, constraints,
    **verifiable** success checks, deliverables) and `DONE.template.md`
-   (acceptance checklist).
+   (acceptance checklist), then hands off to `mai` automatically
+   (skip with `ERA_AUTO_MAI=0`).
 2. `mai` launches Claude headless inside `caffeinate` (Mac can't sleep) +
    `sandbox-exec` (write-jail), with permission prompts disabled — the agent
    decides everything itself, and spawns parallel subagents for big tasks
@@ -84,6 +88,7 @@ MODEL=sonnet MAX_RESUMES=20 MAX_BUDGET_USD=10 mai ./task "mission"
 | `MODEL` | `fable` (mai) / `sonnet` (era) | Claude model alias |
 | `MAX_RESUMES` | `10` | Auto-resume attempts before giving up |
 | `MAX_BUDGET_USD` | `25` | Hard API spend cap per run |
+| `ERA_AUTO_MAI` | `1` | `era` auto-starts `mai` after drafting; set `0` to draft only |
 
 ## Examples
 
