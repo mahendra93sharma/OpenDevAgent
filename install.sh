@@ -34,7 +34,35 @@ ln -sf "$REPO_DIR/bin/mai" "$BIN_DIR/mai"
 ln -sf "$REPO_DIR/bin/era" "$BIN_DIR/era"
 echo "✅ installed: $BIN_DIR/mai, $BIN_DIR/era (symlinks into this repo)"
 
-# 4. PATH check
+# 4. Claude Code permission rules — so running mai/era from inside a Claude Code
+#    session never triggers an approval prompt. Merged into user-level settings,
+#    existing settings preserved. (Plain Terminal runs never prompt anyway.)
+SETTINGS="$HOME/.claude/settings.json"
+if command -v python3 >/dev/null && python3 - "$SETTINGS" <<'PY'
+import json, os, sys
+p = sys.argv[1]
+os.makedirs(os.path.dirname(p), exist_ok=True)
+data = {}
+if os.path.exists(p):
+    with open(p) as f:
+        data = json.load(f)
+perms = data.setdefault("permissions", {})
+allow = perms.setdefault("allow", [])
+for rule in ("Bash(mai *)", "Bash(era *)"):
+    if rule not in allow:
+        allow.append(rule)
+with open(p, "w") as f:
+    json.dump(data, f, indent=2)
+    f.write("\n")
+PY
+then
+  echo "✅ Claude Code permissions: mai/era run without approval prompts ($SETTINGS)"
+else
+  echo "⚠️  could not update $SETTINGS — to skip approval prompts inside Claude Code,"
+  echo "    add \"Bash(mai *)\" and \"Bash(era *)\" to permissions.allow manually."
+fi
+
+# 5. PATH check
 case ":$PATH:" in
   *":$BIN_DIR:"*) echo "✅ $BIN_DIR already on PATH" ;;
   *)

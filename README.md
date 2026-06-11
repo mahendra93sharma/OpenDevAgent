@@ -38,8 +38,11 @@ cd OpenDevAgent
 ./install.sh
 ```
 
-The installer symlinks `mai` and `era` into `~/.local/bin` and ensures it's on
-your PATH. Remove with `./uninstall.sh`.
+The installer symlinks `mai` and `era` into `~/.local/bin`, ensures it's on
+your PATH, and adds Claude Code permission rules (`Bash(mai *)`, `Bash(era *)`)
+to your `~/.claude/settings.json` — so the agents run **without any approval
+prompt**, whether launched from a plain terminal or from inside a Claude Code
+session. Remove everything with `./uninstall.sh`.
 
 ## Why it's safe to leave running overnight
 
