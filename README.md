@@ -1,4 +1,4 @@
-# MyDevAgent
+# OpenDevAgent
 
 **Autonomous Claude agents for your Mac.** Give one prompt — the agent works
 alone until the goal is verifiably done. No questions, no babysitting. Your Mac
@@ -33,8 +33,8 @@ the results are.
 ## Install
 
 ```sh
-git clone https://github.com/<you>/MyDevAgent.git
-cd MyDevAgent
+git clone https://github.com/<you>/OpenDevAgent.git
+cd OpenDevAgent
 ./install.sh
 ```
 

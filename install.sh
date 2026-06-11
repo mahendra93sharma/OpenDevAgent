@@ -1,11 +1,11 @@
 #!/bin/bash
-# MyDevAgent installer — sets up `mai` and `era` system-wide (user level).
+# OpenDevAgent installer — sets up `mai` and `era` system-wide (user level).
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BIN_DIR="$HOME/.local/bin"
 
-echo "MyDevAgent installer"
+echo "OpenDevAgent installer"
 echo "--------------------"
 
 # 1. macOS only (sandbox-exec + caffeinate are macOS tools)
