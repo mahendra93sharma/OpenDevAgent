@@ -42,7 +42,16 @@ MAX_BUDGET_USD="${MAX_BUDGET_USD:-25}"
 LOG_DIR="$AGENT_DIR/.agent/logs"
 mkdir -p "$LOG_DIR"
 RUN_ID="$(date +%Y%m%d-%H%M%S)"
-LOG="$LOG_DIR/run-$RUN_ID.log"
+LOG="$LOG_DIR/run-$RUN_ID.log"           # human-readable, same as console
+RAW_LOG="$LOG_DIR/run-$RUN_ID.jsonl"     # full stream-json events (audit/debug)
+
+# Live log formatter (stream-json -> readable lines). Falls back to cat.
+LOGFMT="$SCRIPT_DIR/oda-logfmt"
+if command -v python3 >/dev/null && [[ -f "$LOGFMT" ]]; then
+  logfmt() { python3 -u "$LOGFMT"; }
+else
+  logfmt() { cat; }
+fi
 
 # Persist mission for resumes / audit
 [[ -f "$AGENT_DIR/MISSION.md" ]] || print -r -- "$MISSION" > "$AGENT_DIR/MISSION.md"
@@ -67,13 +76,18 @@ run_claude() {
       --max-budget-usd "$MAX_BUDGET_USD" \
       --append-system-prompt "$SYSTEM_APPEND" \
       --verbose \
-      "${extra[@]}" 2>&1 | tee -a "$LOG"
+      --output-format stream-json \
+      "${extra[@]}" 2>>"$LOG" \
+    | tee -a "$RAW_LOG" \
+    | logfmt \
+    | tee -a "$LOG"
 }
 
 echo "[mai] agent dir : $AGENT_DIR"   | tee -a "$LOG"
 echo "[mai] model     : $MODEL"        | tee -a "$LOG"
 echo "[mai] budget    : \$$MAX_BUDGET_USD" | tee -a "$LOG"
 echo "[mai] log       : $LOG"
+echo "[mai] raw json  : $RAW_LOG"
 echo "[mai] mission   :"               | tee -a "$LOG"
 print -r -- "$MISSION" | sed 's/^/    /'       | tee -a "$LOG"
 

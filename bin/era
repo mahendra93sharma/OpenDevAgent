@@ -12,12 +12,28 @@
 
 set -u
 
+SCRIPT_DIR="${0:A:h}"
+
 TARGET_RAW="${1:?usage: era <folder> \"<rough prompt>\"}"
 PROMPT="${2:?usage: era <folder> \"<rough prompt>\"}"
 mkdir -p "$TARGET_RAW"
 TARGET="${TARGET_RAW:A}"
 
 MODEL="${MODEL:-sonnet}"
+
+LOG_DIR="$TARGET/.agent/logs"
+mkdir -p "$LOG_DIR"
+RUN_ID="$(date +%Y%m%d-%H%M%S)"
+LOG="$LOG_DIR/era-$RUN_ID.log"           # human-readable, same as console
+RAW_LOG="$LOG_DIR/era-$RUN_ID.jsonl"     # full stream-json events (audit/debug)
+
+# Live log formatter (stream-json -> readable lines). Falls back to cat.
+LOGFMT="$SCRIPT_DIR/oda-logfmt"
+if command -v python3 >/dev/null && [[ -f "$LOGFMT" ]]; then
+  logfmt() { python3 -u "$LOGFMT"; }
+else
+  logfmt() { cat; }
+fi
 
 SYSTEM="You are ERA, a mission architect for an autonomous agent system called MAI. MAI agents run unattended: they get MISSION.md, work alone with full admin rights inside this folder (read-only outside), can spawn parallel subagents, and stop only when they write DONE.md proving the goal is achieved.
 
@@ -32,6 +48,7 @@ cd "$TARGET" || exit 1
 
 echo "[era] target  : $TARGET"
 echo "[era] model   : $MODEL"
+echo "[era] log     : $LOG"
 echo "[era] drafting MISSION.md + DONE.template.md ..."
 
 claude -p \
@@ -39,7 +56,12 @@ claude -p \
   --permission-mode acceptEdits \
   --allowedTools "Read,Write,Edit,Glob,Grep" \
   --append-system-prompt "$SYSTEM" \
-  -- "Rough mission prompt from the user: $PROMPT"
+  --verbose \
+  --output-format stream-json \
+  -- "Rough mission prompt from the user: $PROMPT" 2>>"$LOG" \
+  | tee -a "$RAW_LOG" \
+  | logfmt \
+  | tee -a "$LOG"
 
 if [[ -f "$TARGET/MISSION.md" ]]; then
   echo ""
